@@ -1,19 +1,22 @@
-
+library(ggplot2)
+library(latex2exp)
+library(reshape2)
 
 ############# Simulation 1 ###############
 # Reproduce the simulation 1 (figure 1)  #
+# sample from the target distribution    #
+# U(\theta) = -2\theta^2 + \theta^4      #
 ##########################################
 
-
-## Hamiltonian Monte Carlo
-
-### sample from the target distribution U(\theta) = -2\theta^2 + \theta^4
-
+## common parameters used in all comparing algorithms
 epsilon <- 1e-1
 leapfrog <- 50
-
 iter <- 80000 # total samples
 warmup <- 10000 # warmup samples
+
+theta_collection <- matrix(rep(0, 5 * (iter - warmup)), ncol = 5)
+
+## Hamiltonian Monte Carlo
 
 theta <- rep(0, iter) # parameter of interest
 r <- rep(0, iter) # momentum
@@ -49,21 +52,10 @@ for (i in 1:(iter - 1)){
   }
 }
 
-### density plot
-d_hmc1 <- density(theta[(warmup + 1): iter])
-plot(d_hmc1)
-
+theta_collection[, 1] <- theta[(warmup+1): iter]
 
 
 ## Hamiltonian Monte Carlo without MH correction
-
-### sample from the target distribution U(\theta) = -2\theta^2 + \theta^4
-
-epsilon <- 1e-1
-leapfrog <- 50
-
-iter <- 80000 # total samples
-warmup <- 10000 # warmup samples
 
 theta <- rep(0, iter) # parameter of interest
 r <- rep(0, iter) # momentum
@@ -89,13 +81,11 @@ for (i in 1:(iter - 1)){
   theta[i+1] <- theta_
 }
 
-### density plot
-d_hmc2 <- density(theta[(warmup + 1): iter])
-plot(d_hmc2)
+
+theta_collection[, 2] <- theta[(warmup+1): iter]
 
 
 ## Naive Stochastic Gradient HMC
-### sample from the target distribution U(\theta) = -2\theta^2 + \theta^4
 
 epsilon <- 1e-1
 leapfrog <- 50
@@ -139,22 +129,13 @@ for (i in 1:(iter - 1)){
   }
 }
 
-### density plot
-d_nsghmc1 <- density(theta[(warmup + 1): iter])
-plot(d_nsghmc1)
+
+theta_collection[, 3] <- theta[(warmup+1): iter]
 
 
 
 ## Naive Stochastic Gradient HMC without MH correction
 
-### sample from the target distribution U(\theta) = -2\theta^2 + \theta^4
-
-epsilon <- 1e-1
-leapfrog <- 50
-
-iter <- 80000 # total samples
-warmup <- 10000 # warmup samples
-
 set.seed(225)
 
 theta <- rep(0, iter) # parameter of interest
@@ -181,22 +162,13 @@ for (i in 1:(iter - 1)){
   theta[i+1] <- theta_
 }
 
-### density plot
-d_nsghmc2 <- density(theta[(warmup + 1): iter])
-plot(d_nsghmc2)
 
+theta_collection[, 4] <- theta[(warmup+1): iter]
 
 ## Stochastic Gradient HMC with Friction
 
-### sample from the target distribution U(\theta) = -2\theta^2 + \theta^4
-
-epsilon <- 1e-1
-leapfrog <- 50
 alpha <- 0.03
 V <- 1
-
-iter <- 80000 # total samples
-warmup <- 10000 # warmup samples
 
 set.seed(225)
 
@@ -228,12 +200,14 @@ for (i in 1:(iter - 1)){
   theta[i+1] <- theta_
 }
 
-### density plot
-d_sghmc <- density(theta[(warmup + 1): iter])
-plot(d_sghmc)
+theta_collection[, 5] <- theta[(warmup+1): iter]
 
-plot(d_hmc1, col="blue")
-plot(d_hmc2, col="green", add=TRUE)
-plot(d_nsghmc1, col="red", add=TRUE)
-plot(d_nsghmc2, col="orange", add=TRUE)
-plot(d_sghmc, col="black", add=TRUE)
+theta_collection <- data.frame(theta_collection)
+colnames(theta_collection) <- c("HMC1", "HMC2", "NSGHMC1", "NSGHMC2", "SGHMC")
+theta_collection <- melt(theta_collection, measure.vars=c("HMC1", "HMC2", "NSGHMC1", "NSGHMC2", "SGHMC")) # wide to long
+
+ggplot(theta_collection, aes(x=value, group=variable, colour=variable)) + geom_density() + 
+  scale_colour_manual(labels=c("Standard HMC(with MH)", "Standard HMC(no MH)", "Naive stochastic gradient HMC(with MH)", 
+                              "Naive stochastic gradient HMC(no MH)", "SGHMC"), values=c("red", "orange", "yellow", "green", "blue")) + 
+  labs(x = TeX("$\\theta$"), y = "density", colour = "Algorithms") 
+
