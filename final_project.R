@@ -377,7 +377,7 @@ for (i in 1:(iter - 1)){
 plot(theta[, 1], theta[, 2], type = "p", 
      xlab = TeX("$\\theta_1$"),
      ylab = TeX("$\\theta_2$"), 
-     main = "Naive Stochastic Gradient HMC without MH correction") 
+     main = "Stochastic Gradient HMC with friction") 
 
 ### posterior mean
 print(colMeans(theta)) # theoretical value: 5.0376, 3.3197
