@@ -14,7 +14,7 @@ leapfrog <- 50
 iter <- 80000 # total samples
 warmup <- 10000 # warmup samples
 
-theta_collection <- matrix(rep(0, 5 * (iter)), ncol = 5)
+theta_collection <- matrix(rep(0, 5 * (iter)), ncol = 5) # collect all samples generated from 5 comparing algorithms
 
 ## Hamiltonian Monte Carlo
 
