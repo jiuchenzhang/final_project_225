@@ -31,12 +31,22 @@ normal_data <- function(n, seed){
   return(out)
 }
 
+
+### derivatives of energy function
+deri <- function(Y, theta, Sigma_inv){
+    
+  dev <- -Sigma_inv %*% (Y - theta)
+  
+  return(dev)
+  
+}
+
 ### Common parameters used in all comparing algorithms
 iter <- 5000
 warmup <- 1000
-epsilon <- 0.001
+epsilon <- 1e-5
 delta <- 0.1
-leapfrog <- 50
+leapfrog <- 25
 batch_size <- 5
 
 ## Multivariate Metropolis-Hastings algorithm
@@ -57,8 +67,9 @@ MH <- function(Y, mu, Tau, Sigma, iter, warmup){
   }
 
   end_time <- Sys.time()
-
-  out <- list(theta[(warmup + 1): iter, ], end_time - start_time)
+  running_time <- difftime(end_time, start_time, units = "secs")
+  
+  out <- list(theta[(warmup + 1): iter, ], running_time)
   names(out) <- c("theta", "time")
   return(out)
 }
@@ -68,6 +79,9 @@ MH <- function(Y, mu, Tau, Sigma, iter, warmup){
 HMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog, MHC){
 
   n <- nrow(Y)
+  Sigma_inv <- solve(Sigma)
+  Tau_inv <- solve(Tau)
+  Y_cs <- colSums(Y) # column sums of Y
 
   start_time <- Sys.time()
   theta <- matrix(rep(0, iter * 2), ncol = 2) # parameter of interest
@@ -82,12 +96,12 @@ HMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog, MHC){
     theta_ <- theta[i, ]
     r_ <- r[i, ]
     
-    dev <- - solve(Sigma) %*% (colSums(Y) - n * theta_) + solve(Tau) %*% (theta_ - mu)
+    dev <- rowSums(apply(Y, 1, deri, theta_, Sigma_inv)) + Tau_inv %*% (theta_ - mu)
     r_ <- r_ - epsilon / 2 * dev
     
     for (m in 1: leapfrog){
       theta_ <- theta_ + epsilon * r_
-      dev <- - solve(Sigma) %*% (colSums(Y) - n * theta_) + solve(Tau) %*% (theta_ - mu)
+      dev <- rowSums(apply(Y, 1, deri, theta_, Sigma_inv)) + Tau_inv %*% (theta_ - mu)
       r_ <- r_ - epsilon * dev
     }
     
@@ -95,7 +109,7 @@ HMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog, MHC){
     
     if (MHC){
 
-      dev <- - solve(Sigma) %*% (colSums(Y) - n * theta_) + solve(Tau) %*% (theta_ - mu)
+      dev <- dev <- rowSums(apply(Y, 1, deri, theta_, Sigma_inv)) + Tau_inv %*% (theta_ - mu)
       r_ <- r_ - epsilon / 2 * dev
       H1 <- - sum(log(dmvnorm(Y, mean = theta_, sigma = Sigma))) - 
             log(dmvnorm(t(theta_), mean = mu, sigma = Tau)) + 1/2 * t(r_) %*% r_
@@ -111,8 +125,9 @@ HMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog, MHC){
   }
 
   end_time <- Sys.time()
-
-  out <- list(theta[(warmup + 1): iter, ], end_time - start_time)
+  running_time <- difftime(end_time, start_time, units = "secs")
+  
+  out <- list(theta[(warmup + 1): iter, ], running_time)
   names(out) <- c("theta", "time")
 
   return(out)
@@ -124,6 +139,9 @@ HMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog, MHC){
 NSGHMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog, batch_size, MHC){
   
   n <- nrow(Y)
+  Sigma_inv <- solve(Sigma)
+  Tau_inv <- solve(Tau)
+
   start_time <- Sys.time()
   
   theta <- matrix(rep(0, iter * 2), ncol = 2) # parameter of interest
@@ -139,13 +157,13 @@ NSGHMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog, batch_size, MHC){
     r_ <- r[i, ]
     
     batch <- Y[sample(c(1: n), batch_size), ]
-    dev <- - n / batch_size * solve(Sigma) %*% (colSums(batch) - batch_size * theta_) + solve(Tau) %*% (theta_ - mu)
+    dev <- n / batch_size * rowSums(apply(batch, 1, deri, theta_, Sigma_inv)) + Tau_inv %*% (theta_ - mu)
     r_ <- r_ - epsilon / 2 * dev
     
     for (m in 1: leapfrog){
       theta_ <- theta_ + epsilon * r_
       batch <- Y[sample(c(1: n), batch_size), ]
-      dev <- - n / batch_size * solve(Sigma) %*% (colSums(batch) - batch_size * theta_) + solve(Tau) %*% (theta_ - mu)
+      dev <- n / batch_size * rowSums(apply(batch, 1, deri, theta_, Sigma_inv)) + Tau_inv %*% (theta_ - mu)
       r_ <- r_ - epsilon * dev
     }
     
@@ -154,7 +172,7 @@ NSGHMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog, batch_size, MHC){
     if (MHC){
       
       batch <- Y[sample(c(1: n), batch_size), ]
-      dev <- - n / batch_size * solve(Sigma) %*% (colSums(batch) - batch_size * theta_) + solve(Tau) %*% (theta_ - mu)
+      dev <- n / batch_size * rowSums(apply(batch, 1, deri, theta_, Sigma_inv)) + Tau_inv %*% (theta_ - mu)
       r_ <- r_ - epsilon / 2 * dev
       
       H1 <- - sum(log(dmvnorm(Y, mean = theta_, sigma = Sigma))) -
@@ -171,8 +189,9 @@ NSGHMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog, batch_size, MHC){
   }
   
   end_time <- Sys.time()
+  running_time <- difftime(end_time, start_time, units = "secs")
   
-  out <- list(theta[(warmup + 1): iter, ], end_time - start_time)
+  out <- list(theta[(warmup + 1): iter, ], running_time)
   names(out) <- c("theta", "time")
   
   return(out)
@@ -186,6 +205,8 @@ SGHMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog){
   alpha <- 0.03
   V <- 1
   n <- nrow(Y)
+  Sigma_inv <- solve(Sigma)
+  Tau_inv <- solve(Tau)
   
   start_time <- Sys.time()
   
@@ -204,13 +225,13 @@ SGHMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog){
     r_ <- r[i, ]
     
     batch <- Y[sample(c(1: n), batch_size), ]
-    dev <- - n / batch_size * solve(Sigma) %*% (colSums(batch) - batch_size * theta_) + solve(Tau) %*% (theta_ - mu)
+    dev <- n / batch_size * rowSums(apply(batch, 1, deri, theta_, Sigma_inv)) + Tau_inv %*% (theta_ - mu)
     r_ <- r_ * epsilon
     sig <- 2 * epsilon^2 * (alpha - beta)
     
     for (m in 1: leapfrog){
       batch <- Y[sample(c(1: n), batch_size), ]
-      dev <- - n / batch_size * solve(Sigma) %*% (colSums(batch) - batch_size * theta_) + solve(Tau) %*% (theta_ - mu)
+      dev <- n / batch_size * rowSums(apply(batch, 1, deri, theta_, Sigma_inv)) + Tau_inv %*% (theta_ - mu)
       r_ <- r_ * (1 - alpha) - dev * epsilon^2 + mvrnorm(n=1, mu = mu, Sigma = sig * diag(2))
       theta_ <- theta_ + r_
     }
@@ -218,8 +239,9 @@ SGHMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog){
   }
   
   end_time <- Sys.time()
+  running_time <- difftime(end_time, start_time, units = "secs")
   
-  out <- list(theta[(warmup + 1): iter, ], end_time - start_time)
+  out <- list(theta[(warmup + 1): iter, ], running_time)
   names(out) <- c("theta", "time")
   
   return(out)
@@ -227,11 +249,11 @@ SGHMC <- function(Y, mu, Tau, Sigma, iter, warmup, leapfrog){
 
 ## comparing running time
 
-sample_size <- c(100, 500, 1000, 10000)
+sample_size <- c(10, 50, 100, 200, 500, 1000, 2000)
 
-time_collection <- matrix(rep(0, 6 * 4), ncol = 6)
+time_collection <- matrix(rep(0, 7 * 6), ncol = 6)
 
-for (s in 1: 4){
+for (s in 1: 7){
   
   data <- normal_data(sample_size[s], 225)
   
@@ -249,6 +271,7 @@ for (s in 1: 4){
   time_collection[s, 5] <- res5$time
   time_collection[s, 6] <- res6$time
   
+  print(paste("Sample size is: ", sample_size[s]))
 }
 
 ## visualize the time comparison
