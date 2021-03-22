@@ -292,3 +292,10 @@ ggplot(time_collection, aes(x=log(Sample_size), y=value, colour=variable)) + geo
   scale_colour_manual(labels=c("Metropolis Hastings", "Standard HMC(with MH)", "Standard HMC(no MH)", "Naive stochastic gradient HMC(with MH)", 
                                "Naive stochastic gradient HMC(no MH)", "SGHMC"), values=c("red", "orange", "yellow", "green", "blue", "purple"))
 
+## check the performance of all algorithms
+sample_size <- 500
+
+data <- normal_data(sample_size, 0)
+
+
+

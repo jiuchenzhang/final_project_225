@@ -9,7 +9,7 @@ library(reshape2)
 ##########################################
 
 ## common parameters used in all comparing algorithms
-epsilon <- 1e-1
+epsilon <- 0.1
 leapfrog <- 50
 iter <- 80000 # total samples
 warmup <- 10000 # warmup samples
@@ -197,9 +197,9 @@ theta_collection <- data.frame(theta_collection)
 colnames(theta_collection) <- c("HMC1", "HMC2", "NSGHMC1", "NSGHMC2", "SGHMC")
 theta_collection <- melt(theta_collection, measure.vars=c("HMC1", "HMC2", "NSGHMC1", "NSGHMC2", "SGHMC")) # wide to long
 
-ggplot(theta_collection, aes(x=value, group=variable, colour=variable)) + geom_density() + 
+ggplot(theta_collection, aes(x=value, colour=variable)) + geom_density() + 
   scale_colour_manual(labels=c("Standard HMC(with MH)", "Standard HMC(no MH)", "Naive stochastic gradient HMC(with MH)", 
                               "Naive stochastic gradient HMC(no MH)", "SGHMC"), values=c("red", "orange", "yellow", "green", "blue")) + 
   labs(x = TeX("$\\theta$"), y = "density", colour = "Algorithms", title=TeX(sprintf("$\\epsilon = %f$", epsilon))) 
 
-ggsave(paste("simulation1_epsilon_", epsilon, ".jpg", sep=""))
+ggsave(paste("simulation1_epsilon_", epsilon, ".jpg", sep=""), width = 20, height=12)
