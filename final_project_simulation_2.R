@@ -6,6 +6,7 @@ library(hexbin)
 library(latex2exp)
 library(ggplot2)
 library(reshape2)
+library(mnormt)
 
 ############ Simulation 2 ############
 # Sample posterior distribution of   #
@@ -42,9 +43,9 @@ deri <- function(Y, theta, Sigma_inv){
 }
 
 ### Common parameters used in all comparing algorithms
-iter <- 5000
+iter <- 2000
 warmup <- 1000
-epsilon <- 1e-5
+epsilon <- 1e-3
 delta <- 0.1
 leapfrog <- 25
 batch_size <- 5
@@ -293,9 +294,43 @@ ggplot(time_collection, aes(x=log(Sample_size), y=value, colour=variable)) + geo
                                "Naive stochastic gradient HMC(no MH)", "SGHMC"), values=c("red", "orange", "yellow", "green", "blue", "purple"))
 
 ## check the performance of all algorithms
-sample_size <- 500
+sample_size <- 100
 
-data <- normal_data(sample_size, 0)
+Sigma <- matrix(c(1, 0.7, 0.7, 1), ncol=2)
+Tau <- 10 * diag(2)
+mu <- c(0, 0)
+
+x <- seq(0, 10, 0.1) 
+y <- seq(1, 6, 0.05)
+posterior_mean <- solve(solve(Tau) + sample_size * solve(Sigma)) %*% (solve(Tau) %*% mu + sample_size * solve(Sigma) %*% colMeans(data$Y))
+posterior_sigma <- solve(solve(Tau) + sample_size * solve(Sigma))
+f <- function(x, y){dmnorm(cbind(x, y), c(posterior_mean), posterior_sigma)}
+z <- outer(x, y, f)
+
+data <- normal_data(sample_size, 225)
+
+res1 <- MH(data$Y, mu, Tau, data$Sigma, iter, warmup)
+res2 <- HMC(data$Y, mu, Tau, data$Sigma, iter, warmup, leapfrog, TRUE)
+res3 <- HMC(data$Y, mu, Tau, data$Sigma, iter, warmup, leapfrog, FALSE)
+res4 <- NSGHMC(data$Y, mu, Tau, data$Sigma, iter, warmup, leapfrog, batch_size, TRUE)
+res5 <- NSGHMC(data$Y, mu, Tau, data$Sigma, iter, warmup, leapfrog, batch_size, FALSE)
+res6 <- SGHMC(data$Y, mu, Tau, data$Sigma, iter, warmup, leapfrog)
+
+par(mfrow=c(3, 2))
+
+plot(res1$theta, xlab=TeX("$\\theta_1$"), ylab=TeX("$\\theta_2$"), main="Metropolis-Hastings")
+contour(x, y, z, add=TRUE)
+plot(res2$theta, xlab=TeX("$\\theta_1$"), ylab=TeX("$\\theta_2$"), main="Standard HMC (with MH)")
+contour(x, y, z, add=TRUE)
+plot(res3$theta, xlab=TeX("$\\theta_1$"), ylab=TeX("$\\theta_2$"), main="Standard HMC (no MH)")
+contour(x, y, z, add=TRUE)
+plot(res4$theta, xlab=TeX("$\\theta_1$"), ylab=TeX("$\\theta_2$"), main="Naive Stochastic Gradient HMC (with MH)")
+contour(x, y, z, add=TRUE)
+plot(res5$theta, xlab=TeX("$\\theta_1$"), ylab=TeX("$\\theta_2$"), main="Naive Stochastic Gradient HMC (no MH)")
+contour(x, y, z, add=TRUE)
+plot(res6$theta, xlab=TeX("$\\theta_1$"), ylab=TeX("$\\theta_2$"), main="SGHMC")
+contour(x, y, z, add=TRUE)
+
 
 
 
